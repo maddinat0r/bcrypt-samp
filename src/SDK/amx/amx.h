@@ -21,9 +21,6 @@
  *  Version: $Id: amx.h,v 1.5 2006/03/26 16:56:15 spookie Exp $
  */
 
-namespace samp_sdk
-{
- 
 #ifndef AMX_H_INCLUDED
 #define AMX_H_INCLUDED
 
@@ -444,5 +441,3 @@ int AMXAPI amx_UTF8Put(char *string, char **endptr, int maxchars, cell value);
 #endif
 
 #endif /* AMX_H_INCLUDED */
-
-}
