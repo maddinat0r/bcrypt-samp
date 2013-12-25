@@ -19,3 +19,5 @@
 *.sbr
 obj/
 [Rr]elease*/
+*.opensdf
+*.sdf
