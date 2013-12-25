@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClInclude Include="src\main.h" />
+    <ClInclude Include="src\bcrypt.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\SDK\amxplugin.cpp">
+      <Filter>SDK</Filter>
+    </ClCompile>
+    <ClCompile Include="src\crypt_blowfish\crypt_blowfish.c">
+      <Filter>crypt_blowfish</Filter>
+    </ClCompile>
+    <ClCompile Include="src\crypt_blowfish\crypt_gensalt.c">
+      <Filter>crypt_blowfish</Filter>
+    </ClCompile>
+    <ClCompile Include="src\crypt_blowfish\wrapper.c">
+      <Filter>crypt_blowfish</Filter>
+    </ClCompile>
+    <ClCompile Include="src\bcrypt.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="SDK">
+      <UniqueIdentifier>{c4fb1d46-a8c7-4212-9db6-1aa1ac4659fb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="crypt_blowfish">
+      <UniqueIdentifier>{427f7875-50ce-47d1-b9b8-edcb68d00c2a}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
