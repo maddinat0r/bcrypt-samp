@@ -1,156 +1,95 @@
 #include "main.h"
+#include "bcrypt.h"
 
-using namespace samp_sdk;
 
 logprintf_t logprintf;
 extern void *pAMXFunctions;
 
-std::vector<AMX*> p_Amx;
-std::mutex bcrypt_queue_mutex;
 
-void bcrypt_error(std::string funcname, std::string error)
-{
-	logprintf("bcrypt error: %s (Called from %s)", error.c_str(), funcname.c_str());
-}
-
-void thread_generate_bcrypt(int thread_idx, int thread_id, std::string buffer, short cost)
-{
-	// Process only one thread at once on Windows
-	#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
-		std::lock_guard<std::mutex> lock(bcrypt_queue_mutex);
-	#endif
-
-	Botan::AutoSeeded_RNG rng;
-
-	std::string output_str = Botan::generate_bcrypt(buffer, rng, cost);
-
-	// Process all threads concurrently on Linux
-	#if defined(__LINUX__) || defined(__FreeBSD__) || defined(__OpenBSD__)
-		std::lock_guard<std::mutex> lock(bcrypt_queue_mutex);
-	#endif
-
-	// Add the result to the queue
-	bcrypt_queue.push_back({ BCRYPT_QUEUE_HASH, thread_idx, thread_id, output_str, false });
-}
-
-// native bcrypt_hash(thread_idx, thread_id, password[], cost);
+// native bcrypt_hash(key[], cost, callback_name[], callback_format[], {Float, _}:...);
 cell AMX_NATIVE_CALL bcrypt_hash(AMX* amx, cell* params)
 {
-	// Require 4 parameters
-	if (params[0] != 4 * sizeof(cell))
-	{
-		bcrypt_error("bcrypt_hash", "Incorrect number of parameters (4 required)");
+	if (params[0] < 3 * sizeof(cell))
 		return 0;
-	}
 
-	// Get the parameters
-	int thread_idx = (int) params[1];
-	int thread_id = (int) params[2];
-	unsigned short cost = (unsigned short) params[4];
+	char *key = NULL;
+	unsigned char cost = static_cast<unsigned char>(params[2]);
+	char 
+		*cb_name = NULL,
+		*cb_format = NULL;
+
+	amx_StrParam(amx, params[1], key);
+	amx_StrParam(amx, params[3], cb_name);
+	amx_StrParam(amx, params[4], cb_format);
+
+	if (key == NULL || cb_name == NULL)
+		return 0; //makes no sense to hash something and then not use the hash itself
 
 	if (cost < 4 || cost > 31)
-	{
-		bcrypt_error("bcrypt_hash", "Invalid work factor (cost). Allowed range: 4-31");
 		return 0;
-	}
 
-	std::string password = "";
+	
+	CBcrypt *Crypt = CBcrypt::Create(key, cost, CBcrypt::Task::HASH);
+	Crypt->EnableCallback(cb_name, cb_format, amx, params, 4);
 
-	int len = NULL;
-	cell *addr = NULL;
+	CPlugin::Get()->QueueCrypt(Crypt);
 
-	amx_GetAddr(amx, params[3], &addr);
-	amx_StrLen(addr, &len);
-
-	if (len++)
-	{
-		char *buffer = new char[len];
-		amx_GetString(buffer, addr, 0, len);
-
-		password = std::string(buffer);
-
-		delete [] buffer;
-	}
-
-	// Start a new thread
-	std::thread t(thread_generate_bcrypt, thread_idx, thread_id, password, cost);
-
-	// Leave the thread running
-	t.detach();
 	return 1;
 }
 
-void thread_check_bcrypt(int thread_idx, int thread_id, std::string password, std::string hash)
+
+// native bcrypt_get_hash(dest[]);
+cell AMX_NATIVE_CALL bcrypt_get_hash(AMX* amx, cell* params)
 {
-	bool match;
+	if (params[0] != sizeof(cell))
+		return 0;
 
-	// Hash cannot be valid if it's not 60 characters long
-	if (hash.length() != 60)
-		match = false;
-	else
-	{
-		match = Botan::check_bcrypt(password, hash);
-	}
+	cell *amx_dest_addr = NULL;
+	string &hash = CPlugin::Get()->GetActiveHash();
 
-	std::lock_guard<std::mutex> lock(bcrypt_queue_mutex);
-
-	// Add the result to the queue
-	bcrypt_queue.push_back({ BCRYPT_QUEUE_CHECK, thread_idx, thread_id, "", match });
+	amx_GetAddr(amx, params[1], &amx_dest_addr);
+	amx_SetString(amx_dest_addr, hash.c_str(), 0, 0, 61);
+	return 1;
 }
 
-// native bcrypt_check(thread_idx, thread_id, const password[], const hash[]);
+
+// native bcrypt_check(key[], hash[], callback_name[], callback_format[], {Float, _}:...);
 cell AMX_NATIVE_CALL bcrypt_check(AMX* amx, cell* params)
 {
-	// Require 4 parameters
-	if (params[0] != 4 * sizeof(cell))
-	{
-		bcrypt_error("bcrypt_check", "Incorrect number of parameters (4 required)");
+	if (params[0] < 3 * sizeof(cell))
 		return 0;
-	}
 
-	// Get the parameters
-	int thread_idx = (int) params[1];
-	int thread_id = (int) params[2];
+	char
+		*key = NULL,
+		*hash = NULL,
+		*cb_name = NULL,
+		*cb_format = NULL;
 
-	std::string password = "";
-	std::string hash = "";
+	amx_StrParam(amx, params[1], key);
+	amx_StrParam(amx, params[2], hash);
+	amx_StrParam(amx, params[3], cb_name);
+	amx_StrParam(amx, params[4], cb_format);
 
-	int len[2] = { NULL };
-	cell *addr[2] = { NULL };
+	if (key == NULL || hash == NULL || cb_name == NULL)
+		return 0;
 
-	amx_GetAddr(amx, params[3], &addr[0]);
-	amx_StrLen(addr[0], &len[0]);
 
-	amx_GetAddr(amx, params[4], &addr[1]);
-	amx_StrLen(addr[1], &len[1]);
+	CBcrypt *Crypt = CBcrypt::Create(key, 0, CBcrypt::Task::CHECK, hash);
+	Crypt->EnableCallback(cb_name, cb_format, amx, params, 4);
 
-	if (len[0]++)
-	{
-		char *buffer = new char[len[0]];
-		amx_GetString(buffer, addr[0], 0, len[0]);
+	CPlugin::Get()->QueueCrypt(Crypt);
 
-		password = std::string(buffer);
-
-		delete [] buffer;
-	}
-
-	if (len[1]++)
-	{
-		char *buffer = new char[len[1]];
-		amx_GetString(buffer, addr[1], 0, len[1]);
-
-		hash = std::string(buffer);
-
-		delete [] buffer;
-	}
-
-	// Start a new thread
-	std::thread t(thread_check_bcrypt, thread_idx, thread_id, password, hash);
-
-	// Leave the thread running
-	t.detach();
 	return 1;
 }
+
+
+// native bool:bcrypt_is_equal();
+cell AMX_NATIVE_CALL bcrypt_is_equal(AMX* amx, cell* params)
+{
+	return static_cast<cell>(CPlugin::Get()->IsActiveEqual());
+}
+
+
 
 PLUGIN_EXPORT unsigned int PLUGIN_CALL Supports()
 {
@@ -162,106 +101,43 @@ PLUGIN_EXPORT bool PLUGIN_CALL Load(void **ppData)
 	pAMXFunctions = ppData[PLUGIN_DATA_AMX_EXPORTS];
 	logprintf = (logprintf_t) ppData[PLUGIN_DATA_LOGPRINTF];
 
-	logprintf("");
-	logprintf(" ======================================== ");
-	logprintf("");
-	logprintf("  bcrypt for SA-MP was loaded");
-	logprintf("");
-	logprintf(" ======================================== ");
-	logprintf("");
+	CPlugin::Initialize();
+
+	logprintf(" >> plugin.bcrypt: v2.0 successfully loaded.");
 	return true;
 }
 
 PLUGIN_EXPORT void PLUGIN_CALL Unload()
 {
-	p_Amx.clear();
-
-	logprintf("");
-	logprintf(" ======================================== ");
-	logprintf("");
-	logprintf("  bcrypt for SA-MP was unloaded");
-	logprintf("");
-	logprintf(" ======================================== ");
-	logprintf("");
+	CPlugin::Get()->Destroy();
+	logprintf("plugin.bcrypt: Plugin unloaded.");
 }
 
-PLUGIN_EXPORT void PLUGIN_CALL ProcessTick()
+
+AMX_NATIVE_INFO PluginNatives[] =
 {
-	if (bcrypt_queue.size() > 0)
-	{
-		std::lock_guard<std::mutex> lock(bcrypt_queue_mutex);
-
-		int amx_idx;
-		for (std::vector<AMX*>::iterator a = p_Amx.begin(); a != p_Amx.end(); ++a)
-		{
-			for (std::vector<bcrypt_queue_item>::iterator t = bcrypt_queue.begin(); t != bcrypt_queue.end(); ++t)
-			{
-				if ((*t).type == BCRYPT_QUEUE_HASH)
-				{
-					// public OnBcryptHashed(thread_idx, thread_id, const hash[]);
-
-					if (!amx_FindPublic(*a, "OnBcryptHashed", &amx_idx))
-					{
-						// Push the hash
-						cell addr;
-						amx_PushString(*a, &addr, NULL, (*t).hash.c_str(), NULL, NULL);
-
-						// Push the thread_id and thread_idx
-						amx_Push(*a, (*t).thread_id);
-						amx_Push(*a, (*t).thread_idx);
-
-						// Execute and release memory
-						amx_Exec(*a, NULL, amx_idx);
-						amx_Release(*a, addr);
-					}
-				}
-				else if ((*t).type == BCRYPT_QUEUE_CHECK)
-				{
-					// public OnBcryptChecked(thread_idx, thread_id, bool:match);
-
-					if (!amx_FindPublic(*a, "OnBcryptChecked", &amx_idx))
-					{
-						// Push the thread_id and thread_idx
-						amx_Push(*a, (*t).match);
-						amx_Push(*a, (*t).thread_id);
-						amx_Push(*a, (*t).thread_idx);
-
-						// Execute and release memory
-						amx_Exec(*a, NULL, amx_idx);
-					}
-				}
-			}
-		}
-
-		// Clear the queue
-		bcrypt_queue.clear();
-	}
-}
-
-AMX_NATIVE_INFO PluginNatives [] =
-{
-	{"bcrypt_hash", bcrypt_hash},
-	{ "bcrypt_check", bcrypt_check },
+	AMX_ADD_NATIVE(bcrypt_hash)
+	AMX_ADD_NATIVE(bcrypt_get_hash)
+	AMX_ADD_NATIVE(bcrypt_check)
+	AMX_ADD_NATIVE(bcrypt_is_equal)
 	{ 0, 0 }
 };
 
+
+PLUGIN_EXPORT void PLUGIN_CALL ProcessTick()
+{
+	CPlugin::Get()->ProcessCallbackQueue();
+}
+
 PLUGIN_EXPORT int PLUGIN_CALL AmxLoad(AMX *amx)
 {
-	p_Amx.push_back(amx);
+	CPlugin::Get()->AddAmxInstance(amx);
 	return amx_Register(amx, PluginNatives, -1);
 }
 
 
 PLUGIN_EXPORT int PLUGIN_CALL AmxUnload(AMX *amx)
 {
-	for (std::vector<AMX*>::iterator i = p_Amx.begin(); i != p_Amx.end(); ++i)
-	{
-		if (*i == amx)
-		{
-			p_Amx.erase(i);
-			break;
-		}
-	}
-
+	CPlugin::Get()->RemoveAmxInstance(amx);
 	return AMX_ERR_NONE;
 }
