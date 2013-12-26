@@ -1,8 +1,6 @@
 #include <boost/random/random_device.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
 #include <boost/chrono.hpp>
-namespace random = boost::random;
-namespace chrono = boost::chrono;
 
 #include "bcrypt.h"
 #include "crypt_blowfish/ow-crypt.h"
@@ -11,12 +9,12 @@ namespace chrono = boost::chrono;
 CPlugin *CPlugin::m_Instance = NULL;
 
 
-CBcrypt *CBcrypt::Create(string key, unsigned char cost, Task task, string hash /*= string()*/)
+CBcrypt *CBcrypt::Create(string key, unsigned char cost, TaskType task, string hash /*= string()*/)
 {
 	CBcrypt *crypt = new CBcrypt;
 	crypt->Crypt.Key = key;
 	crypt->Crypt.Task = task;
-	if (task == Task::CHECK)
+	if (task == TaskType::CHECK)
 		crypt->Crypt.Hash = hash;
 	else
 		crypt->Crypt.Cost = cost;
@@ -67,7 +65,7 @@ void CPlugin::ProcessCryptQueue()
 		{
 			switch (crypt_instance->Crypt.Task)
 			{
-				case CBcrypt::Task::HASH:
+				case CBcrypt::TaskType::HASH:
 				{
 					string 
 						chars(
@@ -76,8 +74,8 @@ void CPlugin::ProcessCryptQueue()
 							"1234567890"),
 						raw_salt;
 					//generate random salt
-					random::random_device rand_num_gen;
-					random::uniform_int_distribution<> idx_dist(0, chars.size() - 1);
+					boost::random::random_device rand_num_gen;
+					boost::random::uniform_int_distribution<> idx_dist(0, chars.size() - 1);
 					for (size_t i = 0; i < 21; ++i)
 						raw_salt.push_back(chars.at(idx_dist(rand_num_gen)));
 
@@ -86,7 +84,7 @@ void CPlugin::ProcessCryptQueue()
 					crypt_instance->Crypt.Hash.assign(crypt(crypt_instance->Crypt.Key.c_str(), salt));
 				} break;
 
-				case CBcrypt::Task::CHECK:
+				case CBcrypt::TaskType::CHECK:
 				{
 					string hash2(crypt(crypt_instance->Crypt.Key.c_str(), crypt_instance->Crypt.Hash.c_str()));
 					crypt_instance->Crypt.Equal = crypt_instance->Crypt.Hash == hash2;
@@ -95,7 +93,7 @@ void CPlugin::ProcessCryptQueue()
 
 			m_CallbackQueue.push(crypt_instance);
 		}
-		this_thread::sleep_for(chrono::milliseconds(5));
+		this_thread::sleep_for(boost::chrono::milliseconds(5));
 	}
 }
 

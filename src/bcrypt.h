@@ -26,14 +26,14 @@ using boost::atomic;
 class CBcrypt
 {
 public:
-	enum class Task
+	enum class TaskType
 	{
 		NONE,
 		HASH,
 		CHECK
 	};
 
-	static CBcrypt *Create(string key, unsigned char cost, Task task, string hash = string());
+	static CBcrypt *Create(string key, unsigned char cost, TaskType task, string hash = string());
 	void Destroy();
 
 	inline void EnableCallback(string name, const char *format, AMX *amx, cell *params, const unsigned int param_offset)
@@ -49,7 +49,7 @@ private:
 		string Hash;
 		bool Equal;
 
-		Task Task;
+		TaskType Task;
 	} Crypt;
 
 	class m_CallbackType

@@ -29,7 +29,7 @@ cell AMX_NATIVE_CALL bcrypt_hash(AMX* amx, cell* params)
 		return 0;
 
 	
-	CBcrypt *Crypt = CBcrypt::Create(key, cost, CBcrypt::Task::HASH);
+	CBcrypt *Crypt = CBcrypt::Create(key, cost, CBcrypt::TaskType::HASH);
 	Crypt->EnableCallback(cb_name, cb_format, amx, params, 4);
 
 	CPlugin::Get()->QueueCrypt(Crypt);
@@ -74,7 +74,7 @@ cell AMX_NATIVE_CALL bcrypt_check(AMX* amx, cell* params)
 		return 0;
 
 
-	CBcrypt *Crypt = CBcrypt::Create(key, 0, CBcrypt::Task::CHECK, hash);
+	CBcrypt *Crypt = CBcrypt::Create(key, 0, CBcrypt::TaskType::CHECK, hash);
 	Crypt->EnableCallback(cb_name, cb_format, amx, params, 4);
 
 	CPlugin::Get()->QueueCrypt(Crypt);
