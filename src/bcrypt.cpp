@@ -28,9 +28,9 @@ void CBcrypt::Destroy()
 }
 
 
-void CBcrypt::m_CallbackType::Enable(string name, const char *format, AMX *amx, cell *params, const unsigned int param_offset)
+void CBcrypt::EnableCallback(string name, const char *format, AMX *amx, cell *params, const unsigned int param_offset)
 {
-	Name = name;
+	Callback.Name = name;
 	
 	cell *addr_ptr = NULL;
 	unsigned int param_idx = 1;
@@ -44,11 +44,11 @@ void CBcrypt::m_CallbackType::Enable(string name, const char *format, AMX *amx, 
 			case 'i':
 			case 'f':
 				amx_GetAddr(amx, params[param_offset + param_idx++], &addr_ptr);
-				Params.push(ParamType(Datatype::CELL, *addr_ptr));
+				Callback.Params.push(*addr_ptr);
 				break;
 			case 's':
 				amx_StrParam(amx, params[param_offset + param_idx++], str_buf);
-				Params.push(ParamType(Datatype::STRING, str_buf == NULL ? string() : string(str_buf)));
+				Callback.Params.push(str_buf == NULL ? string() : string(str_buf));
 				break;
 		}
 	} while (*(++format));
@@ -112,14 +112,14 @@ void CPlugin::ProcessCallbackQueue()
 
 				while (!crypt_instance->Callback.Params.empty())
 				{
-					CBcrypt::m_CallbackType::ParamType &param = crypt_instance->Callback.Params.top();
+					variant<cell, string> &param = crypt_instance->Callback.Params.top();
 
-					if (param.Type == CBcrypt::m_CallbackType::Datatype::CELL)
-						amx_Push(amx, param.Cell);
-					else if (param.Type == CBcrypt::m_CallbackType::Datatype::STRING)
+					if (param.type() == typeid(cell))
+						amx_Push(amx, boost::get<cell>(param));
+					else
 					{
 						cell tmp_addr;
-						amx_PushString(amx, &tmp_addr, NULL, param.String.c_str(), 0, 0);
+						amx_PushString(amx, &tmp_addr, NULL, boost::get<string>(param).c_str(), 0, 0);
 						if (amx_addr < NULL)
 							amx_addr = tmp_addr;
 					}

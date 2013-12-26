@@ -10,6 +10,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/lockfree/spsc_queue.hpp>
 #include <boost/atomic/atomic.hpp>
+#include <boost/variant.hpp>
 
 using std::set;
 using std::queue;
@@ -19,6 +20,7 @@ using boost::thread;
 namespace this_thread = boost::this_thread;
 using boost::lockfree::spsc_queue;
 using boost::atomic;
+using boost::variant;
 
 #include "main.h"
 
@@ -36,10 +38,7 @@ public:
 	static CBcrypt *Create(string key, unsigned char cost, TaskType task, string hash = string());
 	void Destroy();
 
-	inline void EnableCallback(string name, const char *format, AMX *amx, cell *params, const unsigned int param_offset)
-	{
-		Callback.Enable(name, format, amx, params, param_offset);
-	}
+	void EnableCallback(string name, const char *format, AMX *amx, cell *params, const unsigned int param_offset);
 
 private:
 	struct
@@ -52,38 +51,10 @@ private:
 		TaskType Task;
 	} Crypt;
 
-	class m_CallbackType
+	struct
 	{
-	private:
-		enum class Datatype
-		{
-			NONE,
-			CELL,
-			STRING
-		};
-		
 		string Name;
-
-		struct ParamType
-		{
-			cell Cell;
-			string String;
-			Datatype Type;
-
-			ParamType(Datatype type, cell cell_val) : 
-				Type(type),
-				Cell(cell_val)
-			{}
-			ParamType(Datatype type, string str_val) :
-				Type(type),
-				String(str_val)
-			{}
-		};
-		stack<ParamType> Params;
-
-		friend class CPlugin;
-	public:
-		void Enable(string name, const char *format, AMX *amx, cell *params, const unsigned int param_offset);
+		stack< variant<cell, string> > Params;
 	} Callback;
 
 	friend class CPlugin;
