@@ -31,6 +31,9 @@ void CBcrypt::Destroy()
 void CBcrypt::EnableCallback(string name, const char *format, AMX *amx, cell *params, const unsigned int param_offset)
 {
 	Callback.Name = name;
+
+	if (format == NULL)
+		return ;
 	
 	cell *addr_ptr = NULL;
 	unsigned int param_idx = 1;
