@@ -41,6 +41,9 @@ public:
 	void EnableCallback(string name, const char *format, AMX *amx, cell *params, const unsigned int param_offset);
 
 private:
+	CBcrypt() {}
+	~CBcrypt() {}
+
 	struct
 	{
 		string Key;
