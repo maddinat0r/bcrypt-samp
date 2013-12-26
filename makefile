@@ -1,26 +1,19 @@
-# This file demonstrates how to compile the bcrypt project on Linux.
-#
-# To compile do:
-#
-# make bcrypt
-#
+GPP = g++ -m32
+GCC = gcc -m32
 
-GPP = g++
-GCC = gcc
 OUTFILE = "./bcrypt.so"
 
-COMPILE_FLAGS = -c -O3 -w -D LINUX -I ./SDK/amx/ --std=c++11 -fPIC -m32 -pthread
+COMPILE_FLAGS = -c -O3 -w -D LINUX -I ./SDK/amx/ -fPIC
+LIBRARIES = -pthread -lrt -Wl,-Bstatic -lboost_thread -lboost_chrono -lboost_system -lboost_atomic -Wl,-Bdynamic
 
+all: bcrypt clean
+	
 clean:
-	-rm *~ *.o *.so
+	rm -f *~ *.o
 
-bcrypt: clean
-	$(GPP) $(COMPILE_FLAGS) ./Botan/Linux/*.cpp
-	$(GPP) $(COMPILE_FLAGS) ./SDK/*.cpp
-	$(GPP) $(COMPILE_FLAGS) ./*.cpp
-	$(GPP) -O2 -fshort-wchar -shared -ldl -lrt -o $(OUTFILE) *.o
+bcrypt:
+	$(GCC) $(COMPILE_FLAGS) src/crypt_blowfish/*.c
+	$(GPP) $(COMPILE_FLAGS) src/SDK/*.cpp
+	$(GPP) $(COMPILE_FLAGS) -std=c++0x src/*.cpp
+	$(GPP) -O2 -fshort-wchar -shared -o $(OUTFILE) *.o $(LIBRARIES)
 
-# You may use bcrypt_quick if you do not need to compile the Botan library
-bcrypt_quick:
-	$(GPP) $(COMPILE_FLAGS) ./main.cpp
-	$(GPP) -O2 -fshort-wchar -shared -ldl -lrt -o $(OUTFILE) *.o
