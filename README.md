@@ -1,84 +1,55 @@
 # Bcrypt for SA-MP
 
-An implementation of bcrypt password hashing library for SA-MP written in C++.
+An implementation of the bcrypt hashing algorithm for PAWN written in C++.
 
 ## Benefits of bcrypt
 
 * All passwords are automatically salted
-* Bcrypt is slow, which makes offline bruteforce attacks less efficient
-* The work factor can be increased as the computers become more powerful
+* Bcrypt is slow, which makes offline bruteforce attacks very hard (depends on the work factor)
+* The work factor can be increased as the computers become more powerful 
 
 ## Functions
-* `bcrypt_hash(thread_idx, thread_id, password[], cost = 12)`
-* `bcrypt_check(thread_idx, thread_id, password[], hash[])`
-
-## Callbacks
-* `OnBcryptHashed(thread_idx, thread_id, const hash[])`
-* `OnBcryptChecked(thread_idx, thread_id, bool:match)`
+* `bcrypt_hash(key[], cost, callback_name[], callback_format[], {Float, _}:...);`
+* `bcrypt_get_hash(dest[]);`
+* `bcrypt_check(key[], hash[], callback_name[], callback_format[], {Float, _}:...);`
+* `bool:bcrypt_is_equal();`
 
 ## Usage
+* Copy the include and plugin file to their appropriate directories
+* Use `bcrypt_hash` if you want to hash user input (e.g. passwords, or when updating the work factor). Once the hash is calculated, the specified callback is called and the hash can be accessed with the function `bcrypt_get_hash`.
 
-* Add the following lines to your gamemode or filterscript:
-
-```
-native bcrypt_hash(thread_idx, thread_id, password[], cost = 12);
-native bcrypt_check(thread_idx, thread_id, password[], hash[]);
- 
-forward OnBcryptHashed(thread_idx, thread_id, const hash[]);
-forward OnBcryptChecked(thread_idx, thread_id, bool:match);
-```
-
-* Call function `bcrypt_hash` when you would like to hash user input (e.g. on registration, or when updating the work factor). Once the hash is calculated, OnBcryptHashed is called, and the parameters include the hash.
-
-* Call function `bcrypt_check` when you would like to verify whether or not user input matches a given hash (e.g. on login). Once the verification is done, OnBcryptChecked will be called. Parameter `match` identifies whether or not the password matched the hash.
+* Use `bcrypt_check` if you want to verify whether or not user input matches a given hash (e.g. on login). Once the verification is done, the specified callback will be called. The function `bcrypt_is_equal` returns true or false whether or not the password matched the hash.
 
 ## Example
 ```
 #include <a_samp>
- 
-native bcrypt_hash(thread_idx, thread_id, password[], cost = 12);
-native bcrypt_check(thread_idx, thread_id, password[], hash[]);
- 
-forward OnBcryptHashed(thread_idx, thread_id, const hash[]);
-forward OnBcryptChecked(thread_idx, thread_id, bool:match);
- 
-// Defining threads
-enum
-{
-    THREAD_REGISTRATION,
-    THREAD_LOGIN
-};
- 
+#include <bcrypt>
+
+
 // Hashing a password
-bcrypt_hash(playerid, THREAD_REGISTRATION, "Hello World!", 12);
- 
-public OnBcryptHashed(thread_idx, thread_id, const hash[])
+bcrypt_hash("MyPassword", 12, "OnPlayerRegister", "d", playerid);
+
+forward public OnPlayerRegister(playerid);
+public OnPlayerRegister(playerid)
 {
-    switch(threadid)
-    {
-        case THREAD_REGISTRATION:
-        {
-            // Could return for instance $2a$12$izP1Fy.pZxOjDOCVma0UneQoQ3sUX3HxfmyibOLPcafDSL8Pj.Ety
-            // The hash will be different every time even for the same input due to the random salt
- 
-            printf("Password hashed for %d: %s (registration)", playerid, hash);
-        }
-    }
+	new hash[61]; //the hash length is always 60
+	bcrypt_get_hash(hash);
+	
+	printf("Password hashed for playerid %d: %s (registration)", playerid, hash);
+	// Could print for instance:
+	//    "Password hashed for playerid 32: $2a$12$izP1Fy.pZxOjDOCVma0UneQoQ3sUX3HxfmyibOLPcafDSL8Pj.Ety (registration)"
+	// The hash will be different every time even for the same input due to the random salt
     return 1;
 }
- 
+
 // Checking a password
-bcrypt_check(playerid, THREAD_LOGIN, inputtext, hash);
- 
-public OnBcryptChecked(thread_idx, thread_id, bool:match)
+bcrypt_check(inputtext, hash, "OnPlayerLogin", "d", playerid);
+
+forward public OnPlayerLogin(playerid);
+public OnPlayerLogin(playerid)
 {
-    switch(threadid)
-    {
-        case THREAD_LOGIN:
-        {
-            printf("Password checked for %d: %s (login)", playerid, (match) ? ("Correct password") : ("Incorrect password"));
-        }
-    }
+	printf("Password checked for playerid %d: %s (login)", playerid, (bcrypt_is_equal()) ? ("Correct password") : ("Incorrect password"));
+
     return 1;
 }
 ```
